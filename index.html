@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Galactic Directory – Sentinel Edition</title>
+<meta name="description" content="Interactive, gamified directory for the Planetary Restoration Archive with constellation visuals, spaceships, XP, badges, and quests.">
+<style>
+  :root{
+    --bg:#000308; --bg2:#030615; --panel:rgba(10,15,40,0.85); --ink:#f0f4ff; --muted:#a8c0e0;
+    --accent:#5eb8ff; --accent2:#46ffb4; --warn:#ffa94d; --danger:#ff6b6b; --glow:#78d4ff;
+    --good:#2dd4a0; --sentinel:#6ec8ff; --peace:#64ffda; --corrupt:#ff7ba3; --dash:#ffc966;
+    --nebula1:#8b5cf6; --nebula2:#ec4899; --nebula3:#3b82f6; --star-glow:#ffeaa7;
+  }
+  
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow-x:hidden}
+  
+  body{
+    color:var(--ink); 
+    background:#000;
+    font:15px/1.6 'Inter', system-ui, -apple-system, sans-serif;
+    position:relative;
+  }
+
+  #galaxy-bg{
+    position:fixed; inset:0; z-index:-5;
+    background: 
+  }
+
+  #stars-layer, #nebula-layer, #constellation-layer{position:fixed; inset:0; pointer-events:none}
+  #stars-layer{z-index:-4}
+  #nebula-layer{z-index:-3; opacity:0.6; mix-blend-mode:screen}
+  #constellation-layer{z-index:-2}
+
+  .lang-selector{
+    position:fixed; top:20px; right:20px; z-index:100;
+    background:rgba(15,25,50,0.9); border:1px solid rgba(94,184,255,0.3);
+    border-radius:12px; padding:8px; backdrop-filter:blur(10px);
+  }
+  .lang-selector select{
+    background:transparent; color:var(--ink); border:none;
+    font-size:14px; padding:4px 8px; cursor:pointer; outline:none;
+  }
+  .lang-selector select option{background:var(--bg2)}
+
+  header{
+    position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg,rgba(10,15,40,0.95),rgba(10,15,40,0.75));
+    backdrop-filter:saturate(180%) blur(20px);
+    border-bottom:1px solid rgba(94,184,255,0.2);
+    box-shadow:0 8px 32px rgba(94,184,255,0.05);
+  }
+  
+  .wrap{max-width:1200px; margin:0 auto; padding:20px}
+  
+  h1{
+    margin:0 0 8px; font-size:28px; font-weight:700;
+    background:linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text; text-shadow:0 0 40px rgba(94,184,255,0.4);
+  }
+  
+  .sub{color:var(--muted); font-size:14px; opacity:0.9}
+  
+  .hud{
+    display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:14px
+  }
+  
+  .chip{
+    background:linear-gradient(135deg,rgba(15,25,50,0.8),rgba(10,20,40,0.9));
+    border:1px solid rgba(94,184,255,0.25);
+    padding:10px 14px; border-radius:999px;
+    display:flex; gap:10px; align-items:center;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.3);
+  }
+  
+  .xpbar{
+    height:12px; width:240px; border-radius:999px;
+    background:rgba(10,15,30,0.8); border:1px solid rgba(94,184,255,0.2);
+    overflow:hidden; position:relative;
+  }
+  .xpbar::before{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+    animation:shimmer 3s infinite;
+  }
+  @keyframes shimmer{0%{transform:translateX(-100%)} 100%{transform:translateX(100%)}}
+  
+  .xpfill{
+    height:100%; width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    box-shadow:0 0 20px var(--glow), inset 0 0 10px rgba(255,255,255,0.2);
+    transition:width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  
+  .badge{
+    padding:4px 10px; border-radius:999px; font-size:11px;
+    font-weight:600; letter-spacing:0.5px; text-transform:uppercase;
+    border:1px solid; position:relative; overflow:hidden;
+  }
+  .badge::before{
+    content:''; position:absolute; inset:0; opacity:0.15;
+    background:linear-gradient(135deg,transparent 30%,rgba(255,255,255,0.4) 50%,transparent 70%);
+    animation:badge-shine 3s infinite;
+  }
+  @keyframes badge-shine{0%{transform:translateX(-100%)} 100%{transform:translateX(100%)}}
+  
+  .b-sentinel{border-color:var(--sentinel); color:var(--sentinel); background:rgba(110,200,255,0.1)}
+  .b-peace{border-color:var(--peace); color:var(--peace); background:rgba(100,255,218,0.1)}
+  .b-corrupt{border-color:var(--corrupt); color:var(--corrupt); background:rgba(255,123,163,0.1)}
+  .b-dash{border-color:var(--dash); color:var(--dash); background:rgba(255,201,102,0.1)}
+  
+  .controls{display:flex; gap:12px; margin-top:14px; flex-wrap:wrap}
+  
+  input[type="search"], select, button{
+    background:rgba(10,20,40,0.8); color:var(--ink);
+    border:1px solid rgba(94,184,255,0.2); border-radius:12px;
+    padding:12px 16px; outline:none; transition:all 0.3s;
+    backdrop-filter:blur(10px);
+  }
+  input[type="search"]{flex:1 1 340px}
+  input[type="search"]:focus, select:hover, button:hover{
+    border-color:rgba(94,184,255,0.5);
+    box-shadow:0 0 20px rgba(94,184,255,0.1);
+    background:rgba(15,30,60,0.85);
+  }
+  button{cursor:pointer; font-weight:500}
+  button:active{transform:translateY(1px)}
+  
+  main{max-width:1280px; margin:24px auto 100px; padding:0 20px}
+  
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:20px; margin-top:20px;
+  }
+  
+  .card{
+    background:linear-gradient(135deg,rgba(15,25,50,0.7),rgba(10,20,40,0.8));
+    backdrop-filter:blur(10px);
+    border:1px solid rgba(94,184,255,0.2);
+    border-radius:20px; padding:20px; position:relative; overflow:hidden;
+    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+  
+  .card::before{
+    content:''; position:absolute; inset:0; opacity:0;
+    background:radial-gradient(600px circle at var(--mouse-x) var(--mouse-y), rgba(94,184,255,0.06), transparent 40%);
+    transition:opacity 0.3s;
+  }
+  .card:hover::before{opacity:1}
+  .card:hover{
+    transform:translateY(-4px) scale(1.02);
+    border-color:rgba(94,184,255,0.4);
+    box-shadow:0 20px 40px rgba(94,184,255,0.15), 0 0 60px rgba(94,184,255,0.05);
+  }
+  
+  .title{
+    font-weight:600; font-size:18px; color:#fff;
+    margin:0 0 8px; word-break:break-word;
+  }
+  .path{color:var(--muted); font-size:13px; opacity:0.8; font-family:monospace}
+  .desc{
+    color:var(--muted); font-size:14px; margin:10px 0;
+    line-height:1.5; min-height:40px;
+  }
+  
+  .tags{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap}
+  
+  .cta{margin-top:16px; display:flex; gap:10px; flex-wrap:wrap}
+  .cta a, .cta button{
+    text-decoration:none; padding:10px 16px; border-radius:12px;
+    background:rgba(94,184,255,0.1); color:var(--accent);
+    border:1px solid rgba(94,184,255,0.3); font-size:14px;
+    font-weight:500; transition:all 0.3s;
+  }
+  .cta a:hover, .cta button:hover{
+    background:rgba(94,184,255,0.2); border-color:rgba(94,184,255,0.5);
+    box-shadow:0 0 20px rgba(94,184,255,0.2);
+  }
+  
+  .special{
+    background:linear-gradient(135deg,rgba(30,40,80,0.8),rgba(20,30,60,0.9));
+    border-color:rgba(94,184,255,0.4);
+    box-shadow:0 0 30px rgba(94,184,255,0.1);
+  }
+  .special .title{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+  
+  details.category{
+    background:linear-gradient(135deg,rgba(15,25,50,0.6),rgba(10,20,40,0.7));
+    backdrop-filter:blur(10px);
+    border:1px solid rgba(94,184,255,0.2);
+    border-radius:20px; padding:16px 20px; margin:20px 0;
+  }
+  details>summary{
+    cursor:pointer; list-style:none; user-select:none;
+    font-weight:600; font-size:18px; color:var(--accent);
+  }
+  details>summary::-webkit-details-marker{display:none}
+  details[open]{border-color:rgba(94,184,255,0.4)}
+  
+  footer{
+    color:var(--muted); text-align:center; padding:40px 20px;
+    background:linear-gradient(180deg,transparent,rgba(10,15,40,0.5));
+  }
+  
+  .ship{
+    position:fixed; width:40px; height:40px; pointer-events:none;
+    opacity:0.7; z-index:1; filter:drop-shadow(0 0 10px var(--glow));
+  }
+  .ship svg{width:100%; height:100%}
+  .ship path{stroke:var(--accent); fill:none; stroke-width:1.5; stroke-linecap:round}
+  
+  @keyframes cruise{
+    0%{transform:translate(-100px, 0) rotate(0deg)}
+    50%{transform:translate(calc(100vw + 100px), -20px) rotate(5deg)}
+    100%{transform:translate(calc(200vw + 200px), 0) rotate(0deg)}
+  }
+  @keyframes float{
+    0%, 100%{transform:translateY(0)}
+    50%{transform:translateY(-15px)}
+  }
+  
+  .ship1{top:15vh; animation:cruise 45s linear infinite, float 6s ease-in-out infinite}
+  .ship2{top:40vh; animation:cruise 60s linear infinite reverse, float 8s ease-in-out infinite}
+  .ship3{top:70vh; animation:cruise 52s linear infinite, float 7s ease-in-out infinite}
+
+  .loading{
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-size:20px; color:var(--accent); z-index:1000;
+  }
+
+  .hide{display:none !important}
+</style>
+</head>
+<body>
+<div id="galaxy-bg"></div>
+<canvas id="stars-layer"></canvas>
+<canvas id="nebula-layer"></canvas>
+<canvas id="constellation-layer"></canvas>
+
+<!-- Language Selector -->
+<div class="lang-selector">
+  <select id="langSelect">
+    <option value="en">🌍 English</option>
+    <option value="es">🇪🇸 Español</option>
+    <option value="fr">🇫🇷 Français</option>
+    <option value="de">🇩🇪 Deutsch</option>
+    <option value="it">🇮🇹 Italiano</option>
+    <option value="pt">🇵🇹 Português</option>
+    <option value="ru">🇷🇺 Русский</option>
+    <option value="zh">🇨🇳 中文</option>
+    <option value="ja">🇯🇵 日本語</option>
+    <option value="ko">🇰🇷 한국어</option>
+    <option value="ar">🇸🇦 العربية</option>
+    <option value="hi">🇮🇳 हिन्दी</option>
+  </select>
+</div>
+
+<header>
+  <div class="wrap">
+    <h1 data-i18n="title">Galactic Directory – <span style="color:var(--accent2)" data-i18n="subtitle">Sentinel Edition</span></h1>
+    <div class="sub" data-i18n="tagline">Explore nodes, earn XP, unlock badges, and hold the line. (Local save; no tracking.)</div>
+    <div class="hud" id="hud">
+      <div class="chip">
+        <span data-i18n="level">Level</span> <span id="lvl">1</span>
+      </div>
+      <div class="chip xpbar">
+        <span id="xpfill" class="xpfill"></span>
+        <span style="position:absolute;left:12px;top:0;font-size:12px;line-height:12px;">
+          <span id="xp">0</span> / <span id="xpcap">100</span> XP
+        </span>
+      </div>
+    </div>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search directories, tags, or paths…" data-i18n-placeholder="searchPlaceholder">
+      <select id="filter">
+        <option value="">All categories</option>
+        <option value="Sentinel">Sentinel</option>
+        <option value="Peace">Peace</option>
+        <option value="Corruption">Corruption</option>
+        <option value="Dashboard">Dashboard</option>
+        <option value="Education">Education</option>
+        <option value="Science">Science</option>
+        <option value="Community">Community</option>
+        <option value="Governance">Governance</option>
+        <option value="Backups">Backups</option>
+        <option value="Funding">Funding</option>
+        <option value="Misc">Misc</option>
+      </select>
+      <button id="favoritesBtn" type="button" data-i18n="favorites">⭐ Favorites</button>
+      <button id="resetProg" type="button" data-i18n="resetProgress">Reset Progress</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <details class="category" open>
+    <summary data-i18n="featuredHubs">⭐ Featured Hubs & Quests</summary>
+    <div class="grid" id="featured"></div>
+  </details>
+
+  <details class="category" open>
+    <summary data-i18n="allDirectories">🌌 All Directories</summary>
+    <div class="grid" id="grid"></div>
+  </details>
+
+  <!-- RSS Feed Bank -->
+  <details class="category" id="rss-bank">
+    <summary>🛰️ RSS Feed Bank</summary>
+    <div class="grid" id="rssGrid"></div>
+  </details>
+
+  <!-- Mycelial Nest: Narrative Reframing Strategies -->
+  <details class="category" id="mycelial-nest">
+    <summary>🍄 Anti-Inversion Mycelial Nest: Narrative Reframing Strategies</summary>
+    <div class="grid" id="mycelialGrid"></div>
+  </details>
+</main>
+
+<footer data-i18n="footer">
+  Planetary Restoration Archive – interactive directory. Be kind; be weird; build peace.
+</footer>
+
+<!-- Animated Spaceships -->
+<div class="ship ship1">
+  <svg viewBox="0 0 24 24"><path d="M2 12h8l2-3 2 6 4-3h4"/></svg>
+</div>
+<div class="ship ship2">
+  <svg viewBox="0 0 24 24"><path d="M1 8h7l2-2 2 4 5-2h6"/></svg>
+</div>
+<div class="ship ship3">
+  <svg viewBox="0 0 24 24"><path d="M0 16h9l2-4 2 5 6-1h5"/></svg>
+</div>
+
+<script>
+// ===== Multi-language Support =====
+const translations = {
+  en: {
+    title: "Galactic Directory – ",
+    subtitle: "Sentinel Edition",
+    tagline: "Explore nodes, earn XP, unlock badges, and hold the line. (Local save; no tracking.)",
+    level: "Level",
+    searchPlaceholder: "Search directories, tags, or paths…",
+    allCategories: "All categories",
+    favorites: "⭐ Favorites",
+    resetProgress: "Reset Progress",
+    featuredHubs: "⭐ Featured Hubs & Quests",
+    allDirectories: "🌌 All Directories",
+    footer: "Planetary Restoration Archive – interactive directory. Be kind; be weird; build peace.",
+    open: "Open",
+    favorite: "☆ Favorite",
+    unfavorite: "★ Unfavorite",
+    confirmReset: "Reset XP, level, visited, favorites?",
+    sentinel_desc: "Guardian protocols and defensive systems for planetary protection",
+    peace_desc: "Initiatives fostering harmony and collaborative solutions",
+    corruption_desc: "Anti-corruption tools and transparency mechanisms",
+    dashboard_desc: "Real-time monitoring and impact tracking interfaces",
+    education_desc: "Learning resources and knowledge sharing platforms",
+    science_desc: "Scientific innovations and technological breakthroughs",
+    community_desc: "Community building and collective action networks",
+    governance_desc: "Decentralized governance and decision-making frameworks",
+    backups_desc: "Data preservation and proof verification systems",
+    funding_desc: "Resource allocation and funding mechanisms",
+    misc_desc: "Various tools and experimental projects"
+  },
+  // ...other languages omitted for brevity (same as before)...
+  // Please copy the rest of the translations from your original code if needed.
+};
+
+let currentLang = 'en';
+
+function setLanguage(lang) {
+  currentLang = lang;
+  const t = translations[lang] || translations['en'];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) el.textContent = t[key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (t[key]) el.placeholder = t[key];
+  });
+  renderAll(filter.value, search.value, favBtn.classList.contains('on'));
+  renderFeatured();
+  renderRSSBank();
+  renderMycelialNest();
+  localStorage.setItem('galactic_lang', lang);
+}
+
+// ===== Photorealistic Galaxy Canvas =====
+(function initGalaxy(){
+  const stars = document.getElementById('stars-layer');
+  const nebula = document.getElementById('nebula-layer');
+  const constellations = document.getElementById('constellation-layer');
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  let W = innerWidth, H = innerHeight;
+  function resizeCanvas() {
+    W = innerWidth; H = innerHeight;
+    [stars, nebula, constellations].forEach(c => {
+      c.width = W * DPR; c.height = H * DPR;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+    });
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  const sCtx = stars.getContext('2d');
+  const nCtx = nebula.getContext('2d');
+  const cCtx = constellations.getContext('2d');
+  const STAR_COUNT = Math.min(800, Math.floor(W * H / 2000));
+  const starField = Array.from({length: STAR_COUNT}, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    r: Math.random() * 2 + 0.1,
+    brightness: Math.random(),
+    twinkle: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.02 + 0.01
+  }));
+  const constellationGroups = [];
+  for (let i = 0; i < 8; i++) {
+    const group = [];
+    const centerX = Math.random() * W;
+    const centerY = Math.random() * H;
+    const pointCount = Math.floor(Math.random() * 4) + 4;
+    for (let j = 0; j < pointCount; j++) {
+      group.push({
+        x: centerX + Math.cos(j / pointCount * Math.PI * 2) * (60 + Math.random() * 80),
+        y: centerY + Math.sin(j / pointCount * Math.PI * 2) * (60 + Math.random() * 80)
+      });
+    }
+    constellationGroups.push(group);
+  }
+  let frame = 0;
+  function animate() {
+    frame += 0.01;
+    sCtx.clearRect(0, 0, W * DPR, H * DPR);
+    nCtx.clearRect(0, 0, W * DPR, H * DPR);
+    cCtx.clearRect(0, 0, W * DPR, H * DPR);
+    sCtx.save();
+    sCtx.scale(DPR, DPR);
+    starField.forEach(star => {
+      const tw = Math.sin(frame * star.speed + star.twinkle) * 0.5 + 0.5;
+      sCtx.beginPath();
+      sCtx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+      sCtx.fillStyle = `rgba(255,255,255,${0.3 + 0.7 * star.brightness * tw})`;
+      sCtx.shadowColor = "#ffeaa7";
+      sCtx.shadowBlur = 8 * star.brightness;
+      sCtx.fill();
+      sCtx.shadowBlur = 0;
+    });
+    sCtx.restore();
+    nCtx.save();
+    nCtx.scale(DPR, DPR);
+    nCtx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 3; i++) {
+      const cx = W * (0.2 + 0.3 * i) + Math.sin(frame + i) * 80;
+      const cy = H * (0.3 + 0.2 * i) + Math.cos(frame + i) * 60;
+      const grad = nCtx.createRadialGradient(cx, cy, 0, cx, cy, 220 + 60 * i);
+      grad.addColorStop(0, i === 0 ? "rgba(139,92,246,0.18)" : i === 1 ? "rgba(236,72,153,0.12)" : "rgba(59,130,246,0.10)");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      nCtx.beginPath();
+      nCtx.arc(cx, cy, 220 + 60 * i, 0, Math.PI * 2);
+      nCtx.fillStyle = grad;
+      nCtx.fill();
+    }
+    nCtx.restore();
+    cCtx.save();
+    cCtx.scale(DPR, DPR);
+    cCtx.strokeStyle = 'rgba(94, 184, 255, 0.2)';
+    cCtx.lineWidth = 1;
+    constellationGroups.forEach(group => {
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const dx = group[i].x - group[j].x, dy = group[i].y - group[j].y;
+          if (dx * dx + dy * dy < 12000) {
+            cCtx.beginPath();
+            cCtx.moveTo(group[i].x, group[i].y);
+            cCtx.lineTo(group[j].x, group[j].y);
+            cCtx.stroke();
+          }
+        }
+        cCtx.beginPath();
+        cCtx.arc(group[i].x, group[i].y, 2.5, 0, Math.PI * 2);
+        cCtx.fillStyle = "#5eb8ff";
+        cCtx.shadowColor = "#5eb8ff";
+        cCtx.shadowBlur = 8;
+        cCtx.fill();
+        cCtx.shadowBlur = 0;
+      }
+    });
+    cCtx.restore();
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ===== Directory Data =====
+const DIRS = [
+  "/inspiration","/donate","/foster","/ymm",
+  "/aeroglass-window-film","/ai-collective-governance-architectures",
+  "/ai-support-site","/aifinalwarning","/aistreamcoach","/alberta",
+  "/animagenesiscore","/anti-collapse-sentinel","/anti-corruption.html",
+  "/apps","/aquabloombottlegarden","/ardrivedesktop","/ashalertapp",
+  "/ashenbloom","/auroraspirenetwork","/autoipsuite",
+  "/autonomous-ai-planetary-repair-dao","/backup","/biocoolpillow",
+  "/biofoambiobreaks","/bioglowtiles","/biotech","/blood-moon","/brief",
+  "/bubble","/bulldog","/buymeacoffeesymbiote","/carney","/cascadulator",
+  "/chat","/chat2","/cityscanner","/cloudnest","/collective","/comms",
+  "/community","/conditional-immutable-storage","/continuity","/contracts",
+  "/corruption","/corruption.zip","/crypto","/dact","/dact-impact-proposal",
+  "/dashboard","/ddd","/ddd-deployer","/debrief","/declaration","/deploy",
+  "/dgn","/digital","/dockerifyandroid","/donationworthydevs",
+  "/donor-intent-router","/donorintentrouter","/eclipseraveil",
+  "/ecobreathpurifier","/ecocoolshingles","/economic","/ecowaveshowerhead",
+  "/edencore","/education","/education2","/emotionalalchemygame","/engine",
+  "/entropy","/fieldkit","/firehalo","/firepreventionsystems",
+  "/flourishingearthprotocolpackage","/forge-overlay-core.js",
+  "/forgivenessispower","/fortmacorchard","/fortmcmurraywildcall",
+  "/fostersforge","/fractalvinerail","/freshfloortiles","/funding",
+  "/fundinginfluxpipeline","/futurescape","/galaxy",
+  "/gamification-engine-standalone","/gaming","/gateway","/gen",
+  "/geoecologicalresonantengineering","/global","/globalnotarization",
+  "/globalsymbioteledger","/glowrootplanter","/goseedbike","/gov",
+  "/government","/guardiantrustmodel","/help","/herolens","/herolens2",
+  "/home_page","/honorlearningcodex","/hostanode","/hydromossmat",
+  "/immusion","/impacttracker","/index","/index-legacy.html","/index.html",
+  "/index001.html","/infographic","/intergenerationalwisdommovement","/ip",
+  "/japan","/kindnesswinsengine","/kinship","/leaderboards","/licensing",
+  "/lightforge","/location","/logs","/loopfall","/lumatideoceanrings",
+  "/master_prompts","/med-neg.html","/meta","/mindmaps",
+  "/missionfuelfunders","/models","/multiagentgnosistawskforce","/musk",
+  "/mycelialenhancementv2","/myco-atmospheric-network","/myco-filter-tiles",
+  "/mycoigloo","/mycomistreforestationpods","/mythbridge",
+  "/narrativereframing","/naturetoaitranslator","/next","/nextgen",
+  "/nextgenbrowsertools","/nullisprismnexus","/offgridpower",
+  "/offgridpowermesh","/one-game","/ontology","/opengamifyedu","/openstay",
+  "/openstay2.0","/openstore","/openstore2.0","/originsingularityforge",
+  "/overlay","/particulateremovalskies","/passivewindtowaterharvester",
+  "/path","/peace","/peace-lab","/peace-ripple-tracker",
+  "/peacerippletracker","/perpetualrestoration","/personafication","/pgp",
+  "/phasedrive","/planetary-repair-agent-swarm",
+  "/planetary-restoration-archive","/planetary-restoration-os",
+  "/postfiresoilrebuilder","/praportal.html","/prime","/prime-sentinel",
+  "/primordis-architect","/progenitor","/progenitor-steward-cleanup-sim",
+  "/project","/projectcoherence","/prompt","/promptpacks","/proof",
+  "/proof-of-possibility","/proof_runner.sh","/proofkit","/proposal",
+  "/public","/publicresumepack","/puremist-bottle","/ref","/reforestation",
+  "/regen","/regenerative-convergence-opportunities",
+  "/regenerative-innovations","/regenerative_education_research_paper1",
+  "/registry","/roadlight","/roadmap","/romarineconcrete","/root",
+  "/safe_archiving_method","/saltflip","/scaffolding","/sentinel",
+  "/sentinelarc","/signal","/skyharvestlantern","/solarweavecanopy",
+  "/spiralliftpod","/start-here","/stateofaffairspublicnotice",
+  "/stellar-loom-gateways","/stratoweave-towers","/sunset",
+  "/support_request_v2.html","/sym","/symbiote001","/symbiotecirclemap",
+  "/symbioteone-orchestrator","/symbioteorchestratorrequest",
+  "/symfungi-shield","/the-paradox-seed","/the_last_protocol",
+  "/therickyfoster","/therickyfoster.github.io","/thermaleaf-panels",
+  "/tight","/trolls","/truthreport","/unified-ontology","/vascusweep",
+  "/vascusweep-tower","/vehicleemotiontether","/veiltext","/waverider",
+  "/why","/wizard"
+];
+
+// ===== Tagging & Description Logic =====
+function tagFor(name) {
+  const n = name.toLowerCase();
+  const tags = [];
+  if (/(^|\/)(sentinel|prime-sentinel|sentinelarc)\b/.test(n)) tags.push("Sentinel");
+  if (/(^|\/)(peace|peace\-lab|peace\-ripple\-tracker|peacerippletracker)\b/.test(n)) tags.push("Peace");
+  if (/corruption|\banti-corruption|stateofaffairs|truthreport/.test(n)) tags.push("Corruption");
+  if (/(dashboard|leaderboards|impacttracker)/.test(n)) tags.push("Dashboard");
+  if (/education|honorlearning|opengamify|gamification|learning|education2/.test(n)) tags.push("Education");
+  if (/eco|solar|myco|bio|hydro|reforestation|postfiresoil|romarine|thermaleaf|stratoweave|spirallift|waverider|fract|phasedrive|vascusweep|engine|models|lab|field|device|showerhead|tiles|canopy|lantern|ocean|filter|moss|igloo|freshfloor|planter/.test(n)) tags.push("Science");
+  if (/community|collective|comms|forum|chat|city|kinship|global|symbiote|registry|roadlight|openstay|openstore|start\-here|publicresumepack/.test(n)) tags.push("Community");
+  if (/gov|government|guardiantrust|policy|declaration|proposal|registry|unified\-ontology|ai\-collective\-governance|planetary\-repair\-agent\-swarm/.test(n)) tags.push("Governance");
+  if (/backup|logs|proof|safe_archiving|globalnotarization|conditional\-immutable\-storage|checksums|\.ots|\.zip$|index\-legacy\.html|index001\.html/.test(n)) tags.push("Backups");
+  if (/funding|donor|buymeacoffee|missionfuel|donate/i.test(name)) tags.push("Funding");
+  if (!tags.length) tags.push("Misc");
+  return tags;
+}
+
+function getDescription(path, tags) {
+  const t = translations[currentLang] || translations['en'];
+  const primaryTag = tags[0];
+  const descKey = primaryTag.toLowerCase() + '_desc';
+  return t[descKey] || t.misc_desc;
+}
+
+// ===== Storage & State Management =====
+const store = {
+  get() { 
+    try { return JSON.parse(localStorage.getItem('galactic_dir') || '{}'); } 
+    catch(e) { return {}; }
+  },
+  set(v) { localStorage.setItem('galactic_dir', JSON.stringify(v)); }
+};
+
+const state = Object.assign({xp: 0, lvl: 1, favs: {}, visited: {}}, store.get());
+const XP_PER_VISIT = 5;
+const XP_SENTINEL_BONUS = 15;
+const XP_PEACE_BONUS = 10;
+const XP_CORR_BONUS = 10;
+const XP_DASH_BONUS = 8;
+
+function capForLevel(l) { return 100 + (l - 1) * 50; }
+
+function addXP(n) {
+  state.xp += n;
+  while (state.xp >= capForLevel(state.lvl)) {
+    state.xp -= capForLevel(state.lvl);
+    state.lvl++;
+  }
+  persist();
+  renderHUD();
+}
+
+function persist() { store.set(state); }
+
+function renderHUD() {
+  document.getElementById('lvl').textContent = state.lvl;
+  document.getElementById('xp').textContent = Math.floor(state.xp);
+  document.getElementById('xpcap').textContent = capForLevel(state.lvl);
+  const xpFill = document.getElementById('xpfill');
+  xpFill.style.width = (state.xp / capForLevel(state.lvl) * 100) + '%';
+}
+
+// ===== Card Creation =====
+function mkEl(tag, cls, txt) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt) e.textContent = txt;
+  return e;
+}
+
+function urlTitle(p) { 
+  return p.replace(/^\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '/'; 
+}
+
+function cardFor(path) {
+  const tags = tagFor(path);
+  const t = translations[currentLang] || translations['en'];
+  const isSpecial = tags.some(tag => ['Sentinel', 'Peace', 'Corruption', 'Dashboard'].includes(tag));
+  const card = mkEl('div', 'card' + (isSpecial ? ' special' : ''));
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    card.style.setProperty('--mouse-x', `${x}px`);
+    card.style.setProperty('--mouse-y', `${y}px`);
+  });
+  const title = mkEl('div', 'title', urlTitle(path));
+  const pathEl = mkEl('div', 'path', path);
+  const desc = mkEl('div', 'desc', getDescription(path, tags));
+  const tagWrap = mkEl('div', 'tags');
+  for (const tag of tags) {
+    let badgeClass = 'badge ';
+    if (tag === "Sentinel") badgeClass += "b-sentinel";
+    else if (tag === "Peace") badgeClass += "b-peace";
+    else if (tag === "Corruption") badgeClass += "b-corrupt";
+    else if (tag === "Dashboard") badgeClass += "b-dash";
+    tagWrap.appendChild(mkEl('span', badgeClass, tag));
+  }
+  const cta = mkEl('div', 'cta');
+  const openBtn = mkEl('a', '', t.open || 'Open');
+  openBtn.href = path;
+  openBtn.addEventListener('click', () => visit(path, tags));
+  const favBtn = mkEl('button', '', state.favs[path] ? (t.unfavorite || '★ Unfavorite') : (t.favorite || '☆ Favorite'));
+  favBtn.addEventListener('click', () => {
+    state.favs[path] = !state.favs[path];
+    persist();
+    favBtn.textContent = state.favs[path] ? (t.unfavorite || '★ Unfavorite') : (t.favorite || '☆ Favorite');
+  });
+  cta.append(openBtn, favBtn);
+  card.append(title, pathEl, desc, tagWrap, cta);
+  return card;
+}
+
+function visit(path, tags) {
+  if (!state.visited[path]) {
+    state.visited[path] = Date.now();
+    let xp = XP_PER_VISIT;
+    if (tags.includes('Sentinel')) xp += XP_SENTINEL_BONUS;
+    if (tags.includes('Peace')) xp += XP_PEACE_BONUS;
+    if (tags.includes('Corruption')) xp += XP_CORR_BONUS;
+    if (tags.includes('Dashboard')) xp += XP_DASH_BONUS;
+    addXP(xp);
+    persist();
+  }
+}
+
+// ===== Rendering =====
+const grid = document.getElementById('grid');
+const featured = document.getElementById('featured');
+const search = document.getElementById('search');
+const filter = document.getElementById('filter');
+const favBtn = document.getElementById('favoritesBtn');
+const resetBtn = document.getElementById('resetProg');
+
+function renderAll(filterTag = '', term = '', onlyFavs = false) {
+  grid.innerHTML = '';
+  const q = term.trim().toLowerCase();
+  const sorted = [...DIRS].sort((a, b) => a.localeCompare(b));
+  for (const p of sorted) {
+    if (onlyFavs && !state.favs[p]) continue;
+    const tags = tagFor(p);
+    if (filterTag && !tags.includes(filterTag)) continue;
+    if (q && !p.toLowerCase().includes(q) && !tags.some(t => t.toLowerCase().includes(q))) continue;
+    grid.appendChild(cardFor(p));
+  }
+}
+
+function renderFeatured() {
+  featured.innerHTML = '';
+  const picks = DIRS.filter(p => {
+    const tags = tagFor(p);
+    return tags.includes("Sentinel") || tags.includes("Peace") || tags.includes("Corruption") || tags.includes("Dashboard");
+  });
+  const top = Array.from(new Set(picks)).sort().slice(0, 8);
+  for (const p of top) featured.appendChild(cardFor(p));
+}
+
+// ===== RSS Feed Bank =====
+const RSS_FEEDS = [
+  {
+    title: "The Guardian Environment",
+    url: "https://www.theguardian.com/environment/rss",
+    desc: "Latest environmental news, science, and activism."
+  },
+  {
+    title: "Yale Environment 360",
+    url: "https://e360.yale.edu/rss",
+    desc: "In-depth reporting and analysis on global environmental issues."
+  },
+  {
+    title: "NASA Earth Science",
+    url: "https://www.nasa.gov/rss/dyn/earth.rss",
+    desc: "Updates from NASA’s Earth Science division."
+  },
+  {
+    title: "Science Daily: Earth & Climate",
+    url: "https://www.sciencedaily.com/rss/earth_climate.xml",
+    desc: "Research news on earth and climate science."
+  },
+  {
+    title: "UN News: Climate and Environment",
+    url: "https://news.un.org/feed/subscribe/en/news/topic/climate-change/feed/rss.xml",
+    desc: "UN news and updates on climate and environment."
+  }
+];
+
+function renderRSSBank() {
+  const rssGrid = document.getElementById('rssGrid');
+  rssGrid.innerHTML = '';
+  RSS_FEEDS.forEach(feed => {
+    const card = mkEl('div', 'card special');
+    card.appendChild(mkEl('div', 'title', feed.title));
+    card.appendChild(mkEl('div', 'desc', feed.desc));
+    const cta = mkEl('div', 'cta');
+    const openBtn = mkEl('a', '', 'Open RSS');
+    openBtn.href = feed.url;
+    openBtn.target = '_blank';
+    openBtn.rel = 'noopener noreferrer';
+    cta.appendChild(openBtn);
+    card.appendChild(cta);
+    rssGrid.appendChild(card);
+  });
+}
+
+// ===== Mycelial Nest: Narrative Reframing Strategies =====
+const NEST_STRATEGIES = [
+  {
+    title: "Reframe Problems as Opportunities",
+    desc: "Shift the narrative from crisis to possibility. Ask: What new solutions or collaborations could emerge from this challenge?"
+  },
+  {
+    title: "Highlight Collective Agency",
+    desc: "Emphasize stories of communities acting together, not just individuals or institutions."
+  },
+  {
+    title: "Center Regeneration, Not Just Restoration",
+    desc: "Focus on cycles of renewal and growth, not only returning to a previous state."
+  },
+  {
+    title: "Use Living System Metaphors",
+    desc: "Describe organizations and movements as ecosystems, mycelial networks, or symbiotic relationships."
+  },
+  {
+    title: "Flip Deficit to Asset",
+    desc: "Spotlight overlooked strengths, skills, or resources in people and places often described as lacking."
+  },
+  {
+    title: "Invite Participation",
+    desc: "Frame the audience as co-creators, not just observers or consumers."
+  },
+  {
+    title: "Expose False Binaries",
+    desc: "Challenge either/or thinking by introducing both/and possibilities."
+  },
+  {
+    title: "Celebrate Small Wins",
+    desc: "Narrate incremental progress as meaningful steps in a larger journey."
+  }
+];
+
+function renderMycelialNest() {
+  const nestGrid = document.getElementById('mycelialGrid');
+  nestGrid.innerHTML = '';
+  NEST_STRATEGIES.forEach(strat => {
+    const card = mkEl('div', 'card');
+    card.appendChild(mkEl('div', 'title', strat.title));
+    card.appendChild(mkEl('div', 'desc', strat.desc));
+    nestGrid.appendChild(card);
+  });
+}
+
+// ===== Event Handlers =====
+search.addEventListener('input', () => renderAll(filter.value, search.value, favBtn.classList.contains('on')));
+filter.addEventListener('change', () => renderAll(filter.value, search.value, favBtn.classList.contains('on')));
+
+favBtn.addEventListener('click', () => {
+  const t = translations[currentLang] || translations['en'];
+  favBtn.classList.toggle('on');
+  favBtn.textContent = favBtn.classList.contains('on') ? (t.favorites + ' (On)') : t.favorites;
+  renderAll(filter.value, search.value, favBtn.classList.contains('on'));
+});
+
+resetBtn.addEventListener('click', () => {
+  const t = translations[currentLang] || translations['en'];
+  if (!confirm(t.confirmReset || 'Reset XP, level, visited, favorites?')) return;
+  localStorage.removeItem('galactic_dir');
+  state.xp = 0; state.lvl = 1; state.favs = {}; state.visited = {};
+  renderHUD();
+  renderFeatured();
+  renderAll(filter.value, search.value, favBtn.classList.contains('on'));
+  renderRSSBank();
+  renderMycelialNest();
+});
+
+// Language selector
+document.getElementById('langSelect').addEventListener('change', (e) => {
+  setLanguage(e.target.value);
+});
+
+// ===== Initialize =====
+const savedLang = localStorage.getItem('galactic_lang') || 'en';
+document.getElementById('langSelect').value = savedLang;
+setLanguage(savedLang);
+
+renderHUD();
+renderFeatured();
+renderAll();
+renderRSSBank();
+renderMycelialNest();
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  const sw = `
+    self.addEventListener('fetch', e => {});
+  `;
+  const blob = new Blob([sw], {type: 'text/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(() => {});
+}
+</script>
+</body>
+</html>

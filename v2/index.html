@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Galactic Directory – Sentinel Edition</title>
+<meta name="description" content="Interactive, gamified directory for the Planetary Restoration Archive with constellation visuals, spaceships, XP, badges, and quests.">
+<style>
+  :root{
+    --bg:#000308; --bg2:#030615; --panel:rgba(10,15,40,0.85); --ink:#f0f4ff; --muted:#a8c0e0;
+    --accent:#5eb8ff; --accent2:#46ffb4; --warn:#ffa94d; --danger:#ff6b6b; --glow:#78d4ff;
+    --good:#2dd4a0; --sentinel:#6ec8ff; --peace:#64ffda; --corrupt:#ff7ba3; --dash:#ffc966;
+    --nebula1:#8b5cf6; --nebula2:#ec4899; --nebula3:#3b82f6; --star-glow:#ffeaa7;
+  }
+  
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow-x:hidden}
+  
+  body{
+    color:var(--ink); 
+    background:#000;
+    font:15px/1.6 'Inter', system-ui, -apple-system, sans-serif;
+    position:relative;
+  }
+
+  /* Photorealistic Galaxy Background */
+  #galaxy-bg{
+    position:fixed; inset:0; z-index:-5;
+    background: 
+      radial-gradient(ellipse at 25% 25%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 75% 75%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 70%),
+      linear-gradient(180deg, #000308 0%, #030615 40%, #0a0f1a 100%);
+  }
+
+  #stars-layer, #nebula-layer, #constellation-layer{position:fixed; inset:0; pointer-events:none}
+  #stars-layer{z-index:-4}
+  #nebula-layer{z-index:-3; opacity:0.6; mix-blend-mode:screen}
+  #constellation-layer{z-index:-2}
+
+  /* Language Selector */
+  .lang-selector{
+    position:fixed; top:20px; right:20px; z-index:100;
+    background:rgba(15,25,50,0.9); border:1px solid rgba(94,184,255,0.3);
+    border-radius:12px; padding:8px; backdrop-filter:blur(10px);
+  }
+  .lang-selector select{
+    background:transparent; color:var(--ink); border:none;
+    font-size:14px; padding:4px 8px; cursor:pointer; outline:none;
+  }
+  .lang-selector select option{background:var(--bg2)}
+
+  /* Header with glass morphism */
+  header{
+    position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg,rgba(10,15,40,0.95),rgba(10,15,40,0.75));
+    backdrop-filter:saturate(180%) blur(20px);
+    border-bottom:1px solid rgba(94,184,255,0.2);
+    box-shadow:0 8px 32px rgba(94,184,255,0.05);
+  }
+  
+  .wrap{max-width:1200px; margin:0 auto; padding:20px}
+  
+  h1{
+    margin:0 0 8px; font-size:28px; font-weight:700;
+    background:linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text; text-shadow:0 0 40px rgba(94,184,255,0.4);
+  }
+  
+  .sub{color:var(--muted); font-size:14px; opacity:0.9}
+  
+  /* HUD with enhanced effects */
+  .hud{
+    display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:14px
+  }
+  
+  .chip{
+    background:linear-gradient(135deg,rgba(15,25,50,0.8),rgba(10,20,40,0.9));
+    border:1px solid rgba(94,184,255,0.25);
+    padding:10px 14px; border-radius:999px;
+    display:flex; gap:10px; align-items:center;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.3);
+  }
+  
+  .xpbar{
+    height:12px; width:240px; border-radius:999px;
+    background:rgba(10,15,30,0.8); border:1px solid rgba(94,184,255,0.2);
+    overflow:hidden; position:relative;
+  }
+  .xpbar::before{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+    animation:shimmer 3s infinite;
+  }
+  @keyframes shimmer{0%{transform:translateX(-100%)} 100%{transform:translateX(100%)}}
+  
+  .xpfill{
+    height:100%; width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    box-shadow:0 0 20px var(--glow), inset 0 0 10px rgba(255,255,255,0.2);
+    transition:width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  
+  .badge{
+    padding:4px 10px; border-radius:999px; font-size:11px;
+    font-weight:600; letter-spacing:0.5px; text-transform:uppercase;
+    border:1px solid; position:relative; overflow:hidden;
+  }
+  .badge::before{
+    content:''; position:absolute; inset:0; opacity:0.15;
+    background:linear-gradient(135deg,transparent 30%,rgba(255,255,255,0.4) 50%,transparent 70%);
+    animation:badge-shine 3s infinite;
+  }
+  @keyframes badge-shine{0%{transform:translateX(-100%)} 100%{transform:translateX(100%)}}
+  
+  .b-sentinel{border-color:var(--sentinel); color:var(--sentinel); background:rgba(110,200,255,0.1)}
+  .b-peace{border-color:var(--peace); color:var(--peace); background:rgba(100,255,218,0.1)}
+  .b-corrupt{border-color:var(--corrupt); color:var(--corrupt); background:rgba(255,123,163,0.1)}
+  .b-dash{border-color:var(--dash); color:var(--dash); background:rgba(255,201,102,0.1)}
+  
+  /* Controls */
+  .controls{display:flex; gap:12px; margin-top:14px; flex-wrap:wrap}
+  
+  input[type="search"], select, button{
+    background:rgba(10,20,40,0.8); color:var(--ink);
+    border:1px solid rgba(94,184,255,0.2); border-radius:12px;
+    padding:12px 16px; outline:none; transition:all 0.3s;
+    backdrop-filter:blur(10px);
+  }
+  input[type="search"]{flex:1 1 340px}
+  input[type="search"]:focus, select:hover, button:hover{
+    border-color:rgba(94,184,255,0.5);
+    box-shadow:0 0 20px rgba(94,184,255,0.1);
+    background:rgba(15,30,60,0.85);
+  }
+  button{cursor:pointer; font-weight:500}
+  button:active{transform:translateY(1px)}
+  
+  /* Main content */
+  main{max-width:1280px; margin:24px auto 100px; padding:0 20px}
+  
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:20px; margin-top:20px;
+  }
+  
+  /* Cards with glass morphism */
+  .card{
+    background:linear-gradient(135deg,rgba(15,25,50,0.7),rgba(10,20,40,0.8));
+    backdrop-filter:blur(10px);
+    border:1px solid rgba(94,184,255,0.2);
+    border-radius:20px; padding:20px; position:relative; overflow:hidden;
+    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+  
+  .card::before{
+    content:''; position:absolute; inset:0; opacity:0;
+    background:radial-gradient(600px circle at var(--mouse-x) var(--mouse-y), rgba(94,184,255,0.06), transparent 40%);
+    transition:opacity 0.3s;
+  }
+  .card:hover::before{opacity:1}
+  .card:hover{
+    transform:translateY(-4px) scale(1.02);
+    border-color:rgba(94,184,255,0.4);
+    box-shadow:0 20px 40px rgba(94,184,255,0.15), 0 0 60px rgba(94,184,255,0.05);
+  }
+  
+  .title{
+    font-weight:600; font-size:18px; color:#fff;
+    margin:0 0 8px; word-break:break-word;
+  }
+  .path{color:var(--muted); font-size:13px; opacity:0.8; font-family:monospace}
+  .desc{
+    color:var(--muted); font-size:14px; margin:10px 0;
+    line-height:1.5; min-height:40px;
+  }
+  
+  .tags{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap}
+  
+  .cta{margin-top:16px; display:flex; gap:10px; flex-wrap:wrap}
+  .cta a, .cta button{
+    text-decoration:none; padding:10px 16px; border-radius:12px;
+    background:rgba(94,184,255,0.1); color:var(--accent);
+    border:1px solid rgba(94,184,255,0.3); font-size:14px;
+    font-weight:500; transition:all 0.3s;
+  }
+  .cta a:hover, .cta button:hover{
+    background:rgba(94,184,255,0.2); border-color:rgba(94,184,255,0.5);
+    box-shadow:0 0 20px rgba(94,184,255,0.2);
+  }
+  
+  /* Special cards */
+  .special{
+    background:linear-gradient(135deg,rgba(30,40,80,0.8),rgba(20,30,60,0.9));
+    border-color:rgba(94,184,255,0.4);
+    box-shadow:0 0 30px rgba(94,184,255,0.1);
+  }
+  .special .title{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+  
+  /* Category sections */
+  details.category{
+    background:linear-gradient(135deg,rgba(15,25,50,0.6),rgba(10,20,40,0.7));
+    backdrop-filter:blur(10px);
+    border:1px solid rgba(94,184,255,0.2);
+    border-radius:20px; padding:16px 20px; margin:20px 0;
+  }
+  details>summary{
+    cursor:pointer; list-style:none; user-select:none;
+    font-weight:600; font-size:18px; color:var(--accent);
+  }
+  details>summary::-webkit-details-marker{display:none}
+  details[open]{border-color:rgba(94,184,255,0.4)}
+  
+  /* Footer */
+  footer{
+    color:var(--muted); text-align:center; padding:40px 20px;
+    background:linear-gradient(180deg,transparent,rgba(10,15,40,0.5));
+  }
+  
+  /* Animated spaceships */
+  .ship{
+    position:fixed; width:40px; height:40px; pointer-events:none;
+    opacity:0.7; z-index:1; filter:drop-shadow(0 0 10px var(--glow));
+  }
+  .ship svg{width:100%; height:100%}
+  .ship path{stroke:var(--accent); fill:none; stroke-width:1.5; stroke-linecap:round}
+  
+  @keyframes cruise{
+    0%{transform:translate(-100px, 0) rotate(0deg)}
+    50%{transform:translate(calc(100vw + 100px), -20px) rotate(5deg)}
+    100%{transform:translate(calc(200vw + 200px), 0) rotate(0deg)}
+  }
+  @keyframes float{
+    0%, 100%{transform:translateY(0)}
+    50%{transform:translateY(-15px)}
+  }
+  
+  .ship1{top:15vh; animation:cruise 45s linear infinite, float 6s ease-in-out infinite}
+  .ship2{top:40vh; animation:cruise 60s linear infinite reverse, float 8s ease-in-out infinite}
+  .ship3{top:70vh; animation:cruise 52s linear infinite, float 7s ease-in-out infinite}
+
+  /* Loading animation */
+  .loading{
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-size:20px; color:var(--accent); z-index:1000;
+  }
+
+  .hide{display:none !important}
+</style>
+</head>
+<body>
+<div id="galaxy-bg"></div>
+<canvas id="stars-layer"></canvas>
+<canvas id="nebula-layer"></canvas>
+<canvas id="constellation-layer"></canvas>
+
+<!-- Language Selector -->
+<div class="lang-selector">
+  <select id="langSelect">
+    <option value="en">🌍 English</option>
+    <option value="es">🇪🇸 Español</option>
+    <option value="fr">🇫🇷 Français</option>
+    <option value="de">🇩🇪 Deutsch</option>
+    <option value="it">🇮🇹 Italiano</option>
+    <option value="pt">🇵🇹 Português</option>
+    <option value="ru">🇷🇺 Русский</option>
+    <option value="zh">🇨🇳 中文</option>
+    <option value="ja">🇯🇵 日本語</option>
+    <option value="ko">🇰🇷 한국어</option>
+    <option value="ar">🇸🇦 العربية</option>
+    <option value="hi">🇮🇳 हिन्दी</option>
+  </select>
+</div>
+
+<header>
+  <div class="wrap">
+    <h1 data-i18n="title">Galactic Directory – <span style="color:var(--accent2)" data-i18n="subtitle">Sentinel Edition</span></h1>
+    <div class="sub" data-i18n="tagline">Explore nodes, earn XP, unlock badges, and hold the line. (Local save; no tracking.)</div>
+    <div class="hud">
+      <div class="chip"><span data-i18n="level">Level</span> <strong id="lvl">1</strong></div>
+      <div class="chip" style="gap:12px">
+        <div class="xpbar"><div id="xpfill" class="xpfill"></div></div>
+        <span><span id="xp">0</span> / <span id="xpcap">100</span> XP</span>
+      </div>
+      <div class="chip">
+        <span class="badge b-sentinel">SENTINEL</span>
+        <span class="badge b-peace">PEACE</span>
+        <span class="badge b-corrupt">ANTI-CORRUPTION</span>
+        <span class="badge b-dash">DASHBOARD</span>
+      </div>
+    </div>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search directories, tags, or paths…" data-i18n-placeholder="searchPlaceholder">
+      <select id="filter">
+        <option value="" data-i18n="allCategories">All categories</option>
+        <option value="Sentinel">Sentinel</option>
+        <option value="Peace">Peace</option>
+        <option value="Corruption">Corruption</option>
+        <option value="Dashboard">Dashboards</option>
+        <option value="Education">Education</option>
+        <option value="Science">Science/Tech</option>
+        <option value="Community">Community</option>
+        <option value="Governance">Governance</option>
+        <option value="Backups">Backups/Proof</option>
+        <option value="Funding">Funding</option>
+        <option value="Misc">Misc</option>
+      </select>
+      <button id="favoritesBtn" data-i18n="favorites">⭐ Favorites</button>
+      <button id="resetProg" data-i18n="resetProgress">Reset Progress</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <details class="category" open>
+    <summary data-i18n="featuredHubs">⭐ Featured Hubs & Quests</summary>
+    <div class="grid" id="featured"></div>
+  </details>
+
+  <details class="category" open>
+    <summary data-i18n="allDirectories">🌌 All Directories</summary>
+    <div class="grid" id="grid"></div>
+  </details>
+</main>
+
+<footer data-i18n="footer">
+  Planetary Restoration Archive – interactive directory. Be kind; be weird; build peace.
+</footer>
+
+<!-- Animated Spaceships -->
+<div class="ship ship1">
+  <svg viewBox="0 0 24 24"><path d="M2 12h8l2-3 2 6 4-3h4"/></svg>
+</div>
+<div class="ship ship2">
+  <svg viewBox="0 0 24 24"><path d="M1 8h7l2-2 2 4 5-2h6"/></svg>
+</div>
+<div class="ship ship3">
+  <svg viewBox="0 0 24 24"><path d="M0 16h9l2-4 2 5 6-1h5"/></svg>
+</div>
+
+<script>
+// ===== Multi-language Support =====
+const translations = {
+  en: {
+    title: "Galactic Directory – ",
+    subtitle: "Sentinel Edition",
+    tagline: "Explore nodes, earn XP, unlock badges, and hold the line. (Local save; no tracking.)",
+    level: "Level",
+    searchPlaceholder: "Search directories, tags, or paths…",
+    allCategories: "All categories",
+    favorites: "⭐ Favorites",
+    resetProgress: "Reset Progress",
+    featuredHubs: "⭐ Featured Hubs & Quests",
+    allDirectories: "🌌 All Directories",
+    footer: "Planetary Restoration Archive – interactive directory. Be kind; be weird; build peace.",
+    open: "Open",
+    favorite: "☆ Favorite",
+    unfavorite: "★ Unfavorite",
+    confirmReset: "Reset XP, level, visited, favorites?",
+    // Content descriptions
+    sentinel_desc: "Guardian protocols and defensive systems for planetary protection",
+    peace_desc: "Initiatives fostering harmony and collaborative solutions",
+    corruption_desc: "Anti-corruption tools and transparency mechanisms",
+    dashboard_desc: "Real-time monitoring and impact tracking interfaces",
+    education_desc: "Learning resources and knowledge sharing platforms",
+    science_desc: "Scientific innovations and technological breakthroughs",
+    community_desc: "Community building and collective action networks",
+    governance_desc: "Decentralized governance and decision-making frameworks",
+    backups_desc: "Data preservation and proof verification systems",
+    funding_desc: "Resource allocation and funding mechanisms",
+    misc_desc: "Various tools and experimental projects"
+  },
+  es: {
+    title: "Directorio Galáctico – ",
+    subtitle: "Edición Centinela",
+    tagline: "Explora nodos, gana XP, desbloquea insignias y mantén la línea. (Guardado local; sin seguimiento.)",
+    level: "Nivel",
+    searchPlaceholder: "Buscar directorios, etiquetas o rutas…",
+    allCategories: "Todas las categorías",
+    favorites: "⭐ Favoritos",
+    resetProgress: "Reiniciar Progreso",
+    featuredHubs: "⭐ Centros y Misiones Destacadas",
+    allDirectories: "🌌 Todos los Directorios",
+    footer: "Archivo de Restauración Planetaria – directorio interactivo. Sé amable; sé raro; construye la paz.",
+    open: "Abrir",
+    favorite: "☆ Favorito",
+    unfavorite: "★ No Favorito",
+    confirmReset: "¿Reiniciar XP, nivel, visitados, favoritos?",
+    sentinel_desc: "Protocolos guardianes y sistemas defensivos para la protección planetaria",
+    peace_desc: "Iniciativas que fomentan la armonía y soluciones colaborativas",
+    corruption_desc: "Herramientas anticorrupción y mecanismos de transparencia",
+    dashboard_desc: "Interfaces de monitoreo en tiempo real y seguimiento de impacto",
+    education_desc: "Recursos de aprendizaje y plataformas para compartir conocimiento",
+    science_desc: "Innovaciones científicas y avances tecnológicos",
+    community_desc: "Construcción comunitaria y redes de acción colectiva",
+    governance_desc: "Gobernanza descentralizada y marcos de toma de decisiones",
+    backups_desc: "Sistemas de preservación de datos y verificación de pruebas",
+    funding_desc: "Asignación de recursos y mecanismos de financiación",
+    misc_desc: "Varias herramientas y proyectos experimentales"
+  },
+  fr: {
+    title: "Répertoire Galactique – ",
+    subtitle: "Édition Sentinelle",
+    tagline: "Explorez les nœuds, gagnez de l'XP, débloquez des badges et tenez la ligne. (Sauvegarde locale; pas de suivi.)",
+    level: "Niveau",
+    searchPlaceholder: "Rechercher répertoires, tags ou chemins…",
+    allCategories: "Toutes les catégories",
+    favorites: "⭐ Favoris",
+    resetProgress: "Réinitialiser le Progrès",
+    featuredHubs: "⭐ Centres et Quêtes en Vedette",
+    allDirectories: "🌌 Tous les Répertoires",
+    footer: "Archive de Restauration Planétaire – répertoire interactif. Soyez gentil; soyez bizarre; construisez la paix.",
+    open: "Ouvrir",
+    favorite: "☆ Favori",
+    unfavorite: "★ Retirer des Favoris",
+    confirmReset: "Réinitialiser XP, niveau, visités, favoris?",
+    sentinel_desc: "Protocoles gardiens et systèmes défensifs pour la protection planétaire",
+    peace_desc: "Initiatives favorisant l'harmonie et les solutions collaboratives",
+    corruption_desc: "Outils anti-corruption et mécanismes de transparence",
+    dashboard_desc: "Interfaces de surveillance en temps réel et suivi d'impact",
+    education_desc: "Ressources d'apprentissage et plateformes de partage de connaissances",
+    science_desc: "Innovations scientifiques et percées technologiques",
+    community_desc: "Construction communautaire et réseaux d'action collective",
+    governance_desc: "Gouvernance décentralisée et cadres décisionnels",
+    backups_desc: "Systèmes de préservation des données et vérification des preuves",
+    funding_desc: "Allocation des ressources et mécanismes de financement",
+    misc_desc: "Divers outils et projets expérimentaux"
+  },
+  zh: {
+    title: "银河目录 – ",
+    subtitle: "哨兵版",
+    tagline: "探索节点，获得经验值，解锁徽章，守住防线。（本地保存；无跟踪。）",
+    level: "等级",
+    searchPlaceholder: "搜索目录、标签或路径…",
+    allCategories: "所有类别",
+    favorites: "⭐ 收藏",
+    resetProgress: "重置进度",
+    featuredHubs: "⭐ 精选中心与任务",
+    allDirectories: "🌌 所有目录",
+    footer: "行星修复档案 – 互动目录。善良；怪异；建设和平。",
+    open: "打开",
+    favorite: "☆ 收藏",
+    unfavorite: "★ 取消收藏",
+    confirmReset: "重置经验值、等级、访问记录、收藏？",
+    sentinel_desc: "行星保护的守护协议和防御系统",
+    peace_desc: "促进和谐与协作解决方案的倡议",
+    corruption_desc: "反腐败工具和透明机制",
+    dashboard_desc: "实时监控和影响跟踪界面",
+    education_desc: "学习资源和知识共享平台",
+    science_desc: "科学创新和技术突破",
+    community_desc: "社区建设和集体行动网络",
+    governance_desc: "去中心化治理和决策框架",
+    backups_desc: "数据保存和证明验证系统",
+    funding_desc: "资源分配和融资机制",
+    misc_desc: "各种工具和实验项目"
+  },
+  ja: {
+    title: "銀河ディレクトリ – ",
+    subtitle: "センチネル版",
+    tagline: "ノードを探索し、XPを獲得し、バッジをアンロックし、ラインを保持します。（ローカル保存；追跡なし。）",
+    level: "レベル",
+    searchPlaceholder: "ディレクトリ、タグ、パスを検索…",
+    allCategories: "すべてのカテゴリ",
+    favorites: "⭐ お気に入り",
+    resetProgress: "進行状況をリセット",
+    featuredHubs: "⭐ 注目のハブとクエスト",
+    allDirectories: "🌌 すべてのディレクトリ",
+    footer: "惑星復元アーカイブ – インタラクティブディレクトリ。親切に；奇妙に；平和を築く。",
+    open: "開く",
+    favorite: "☆ お気に入り",
+    unfavorite: "★ お気に入り解除",
+    confirmReset: "XP、レベル、訪問済み、お気に入りをリセットしますか？",
+    sentinel_desc: "惑星保護のための守護プロトコルと防御システム",
+    peace_desc: "調和と協力的な解決策を促進するイニシアチブ",
+    corruption_desc: "反腐敗ツールと透明性メカニズム",
+    dashboard_desc: "リアルタイム監視と影響追跡インターフェース",
+    education_desc: "学習リソースと知識共有プラットフォーム",
+    science_desc: "科学的革新と技術的ブレークスルー",
+    community_desc: "コミュニティ構築と集団行動ネットワーク",
+    governance_desc: "分散型ガバナンスと意思決定フレームワーク",
+    backups_desc: "データ保存と証明検証システム",
+    funding_desc: "リソース配分と資金調達メカニズム",
+    misc_desc: "さまざまなツールと実験的プロジェクト"
+  }
+};
+
+let currentLang = 'en';
+
+function setLanguage(lang) {
+  currentLang = lang;
+  const t = translations[lang] || translations['en'];
+  
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) {
+      if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+        el.placeholder = t[key];
+      } else {
+        el.textContent = t[key];
+      }
+    }
+  });
+  
+  // Update placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (t[key]) el.placeholder = t[key];
+  });
+  
+  // Re-render to update dynamic content
+  renderAll(filter.value, search.value, favBtn.classList.contains('on'));
+  renderFeatured();
+  
+  // Save language preference
+  localStorage.setItem('galactic_lang', lang);
+}
+
+// ===== Photorealistic Galaxy Canvas =====
+(function initGalaxy(){
+  const stars = document.getElementById('stars-layer');
+  const nebula = document.getElementById('nebula-layer');
+  const constellations = document.getElementById('constellation-layer');
+  
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  let W = innerWidth, H = innerHeight;
+  
+  function resizeCanvas() {
+    W = innerWidth; H = innerHeight;
+    [stars, nebula, constellations].forEach(c => {
+      c.width = W * DPR; c.height = H * DPR;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+    });
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  
+  const sCtx = stars.getContext('2d');
+  const nCtx = nebula.getContext('2d');
+  const cCtx = constellations.getContext('2d');
+  
+  // Generate stars with varying sizes and brightness
+  const STAR_COUNT = Math.min(800, Math.floor(W * H / 2000));
+  const starField = Array.from({length: STAR_COUNT}, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    r: Math.random() * 2 + 0.1,
+    brightness: Math.random(),
+    twinkle: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.02 + 0.01
+  }));
+  
+  // Constellation points
+  const constellationGroups = [];
+  for (let i = 0; i < 8; i++) {
+    const group = [];
+    const centerX = Math.random() * W;
+    const centerY = Math.random() * H;
+    const pointCount = Math.floor(Math.random() * 4) + 4;
+    for (let j = 0; j < pointCount; j++) {
+      group.push({
+        x: centerX + (Math.random() - 0.5) * 200,
+        y: centerY + (Math.random() - 0.5) * 200,
+        connected: []
+      });
+    }
+    // Connect nearby stars
+    for (let j = 0; j < pointCount; j++) {
+      for (let k = j + 1; k < pointCount; k++) {
+        const dist = Math.hypot(group[j].x - group[k].x, group[j].y - group[k].y);
+        if (dist < 120 && Math.random() > 0.3) {
+          group[j].connected.push(k);
+        }
+      }
+    }
+    constellationGroups.push(group);
+  }
+  
+  // Animation loop
+  let frame = 0;
+  function animate() {
+    frame += 0.01;
+    
+    // Clear canvases
+    sCtx.clearRect(0, 0, W * DPR, H * DPR);
+    nCtx.clearRect(0, 0, W * DPR, H * DPR);
+    cCtx.clearRect(0, 0, W * DPR, H * DPR);
+    
+    // Draw stars
+    sCtx.save();
+    sCtx.scale(DPR, DPR);
+    starField.forEach(star => {
+      star.twinkle += star.speed;
+      const alpha = 0.4 + 0.6 * Math.sin(star.twinkle) * star.brightness;
+      const glow = star.r > 1 ? star.r * 3 : 0;
+      
+      if (glow > 0) {
+        const gradient = sCtx.createRadialGradient(star.x, star.y, 0, star.x, star.y, glow);
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        gradient.addColorStop(0.5, `rgba(200, 220, 255, ${alpha * 0.3})`);
+        gradient.addColorStop(1, 'rgba(100, 150, 255, 0)');
+        sCtx.fillStyle = gradient;
+        sCtx.fillRect(star.x - glow, star.y - glow, glow * 2, glow * 2);
+      }
+      
+      sCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      sCtx.beginPath();
+      sCtx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+      sCtx.fill();
+    });
+    sCtx.restore();
+    
+    // Draw nebula clouds
+    nCtx.save();
+    nCtx.scale(DPR, DPR);
+    nCtx.globalCompositeOperation = 'screen';
+    
+    for (let i = 0; i < 3; i++) {
+      const x = W * 0.5 + Math.sin(frame * 0.2 + i) * 100;
+      const y = H * 0.5 + Math.cos(frame * 0.15 + i) * 100;
+      
+      const gradient = nCtx.createRadialGradient(x, y, 0, x, y, 300);
+      const colors = [
+        ['139, 92, 246', '236, 72, 153'],
+        ['59, 130, 246', '147, 51, 234'],
+        ['236, 72, 153', '251, 146, 60']
+      ][i];
+      
+      gradient.addColorStop(0, `rgba(${colors[0]}, 0.15)`);
+      gradient.addColorStop(0.5, `rgba(${colors[1]}, 0.08)`);
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      
+      nCtx.fillStyle = gradient;
+      nCtx.fillRect(0, 0, W, H);
+    }
+    nCtx.restore();
+    
+    // Draw constellations
+    cCtx.save();
+    cCtx.scale(DPR, DPR);
+    cCtx.strokeStyle = 'rgba(94, 184, 255, 0.2)';
+    cCtx.lineWidth = 1;
+    
+    constellationGroups.forEach(group => {
+      // Draw connections
+      group.forEach((point, i) => {
+        point.connected.forEach(targetIndex => {
+          const target = group[targetIndex];
+          cCtx.beginPath();
+          cCtx.moveTo(point.x, point.y);
+          cCtx.lineTo(target.x, target.y);
+          cCtx.stroke();
+        });
+      });
+      
+      // Draw constellation stars
+      group.forEach(point => {
+        const pulse = 0.6 + 0.4 * Math.sin(frame * 2 + point.x * 0.01);
+        cCtx.fillStyle = `rgba(150, 200, 255, ${pulse})`;
+        cCtx.beginPath();
+        cCtx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+        cCtx.fill();
+      });
+    });
+    cCtx.restore();
+    
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ===== Directory Data =====
+const DIRS = [
+  "/inspiration","/donate","/foster","/ymm",
+  "/aeroglass-window-film","/ai-collective-governance-architectures",
+  "/ai-support-site","/aifinalwarning","/aistreamcoach","/alberta",
+  "/animagenesiscore","/anti-collapse-sentinel","/anti-corruption.html",
+  "/apps","/aquabloombottlegarden","/ardrivedesktop","/ashalertapp",
+  "/ashenbloom","/auroraspirenetwork","/autoipsuite",
+  "/autonomous-ai-planetary-repair-dao","/backup","/biocoolpillow",
+  "/biofoambiobreaks","/bioglowtiles","/biotech","/blood-moon","/brief",
+  "/bubble","/bulldog","/buymeacoffeesymbiote","/carney","/cascadulator",
+  "/chat","/chat2","/cityscanner","/cloudnest","/collective","/comms",
+  "/community","/conditional-immutable-storage","/continuity","/contracts",
+  "/corruption","/corruption.zip","/crypto","/dact","/dact-impact-proposal",
+  "/dashboard","/ddd","/ddd-deployer","/debrief","/declaration","/deploy",
+  "/dgn","/digital","/dockerifyandroid","/donationworthydevs",
+  "/donor-intent-router","/donorintentrouter","/eclipseraveil",
+  "/ecobreathpurifier","/ecocoolshingles","/economic","/ecowaveshowerhead",
+  "/edencore","/education","/education2","/emotionalalchemygame","/engine",
+  "/entropy","/fieldkit","/firehalo","/firepreventionsystems",
+  "/flourishingearthprotocolpackage","/forge-overlay-core.js",
+  "/forgivenessispower","/fortmacorchard","/fortmcmurraywildcall",
+  "/fostersforge","/fractalvinerail","/freshfloortiles","/funding",
+  "/fundinginfluxpipeline","/futurescape","/galaxy",
+  "/gamification-engine-standalone","/gaming","/gateway","/gen",
+  "/geoecologicalresonantengineering","/global","/globalnotarization",
+  "/globalsymbioteledger","/glowrootplanter","/goseedbike","/gov",
+  "/government","/guardiantrustmodel","/help","/herolens","/herolens2",
+  "/home_page","/honorlearningcodex","/hostanode","/hydromossmat",
+  "/immusion","/impacttracker","/index","/index-legacy.html","/index.html",
+  "/index001.html","/infographic","/intergenerationalwisdommovement","/ip",
+  "/japan","/kindnesswinsengine","/kinship","/leaderboards","/licensing",
+  "/lightforge","/location","/logs","/loopfall","/lumatideoceanrings",
+  "/master_prompts","/med-neg.html","/meta","/mindmaps",
+  "/missionfuelfunders","/models","/multiagentgnosistawskforce","/musk",
+  "/mycelialenhancementv2","/myco-atmospheric-network","/myco-filter-tiles",
+  "/mycoigloo","/mycomistreforestationpods","/mythbridge",
+  "/narrativereframing","/naturetoaitranslator","/next","/nextgen",
+  "/nextgenbrowsertools","/nullisprismnexus","/offgridpower",
+  "/offgridpowermesh","/one-game","/ontology","/opengamifyedu","/openstay",
+  "/openstay2.0","/openstore","/openstore2.0","/originsingularityforge",
+  "/overlay","/particulateremovalskies","/passivewindtowaterharvester",
+  "/path","/peace","/peace-lab","/peace-ripple-tracker",
+  "/peacerippletracker","/perpetualrestoration","/personafication","/pgp",
+  "/phasedrive","/planetary-repair-agent-swarm",
+  "/planetary-restoration-archive","/planetary-restoration-os",
+  "/postfiresoilrebuilder","/praportal.html","/prime","/prime-sentinel",
+  "/primordis-architect","/progenitor","/progenitor-steward-cleanup-sim",
+  "/project","/projectcoherence","/prompt","/promptpacks","/proof",
+  "/proof-of-possibility","/proof_runner.sh","/proofkit","/proposal",
+  "/public","/publicresumepack","/puremist-bottle","/ref","/reforestation",
+  "/regen","/regenerative-convergence-opportunities",
+  "/regenerative-innovations","/regenerative_education_research_paper1",
+  "/registry","/roadlight","/roadmap","/romarineconcrete","/root",
+  "/safe_archiving_method","/saltflip","/scaffolding","/sentinel",
+  "/sentinelarc","/signal","/skyharvestlantern","/solarweavecanopy",
+  "/spiralliftpod","/start-here","/stateofaffairspublicnotice",
+  "/stellar-loom-gateways","/stratoweave-towers","/sunset",
+  "/support_request_v2.html","/sym","/symbiote001","/symbiotecirclemap",
+  "/symbioteone-orchestrator","/symbioteorchestratorrequest",
+  "/symfungi-shield","/the-paradox-seed","/the_last_protocol",
+  "/therickyfoster","/therickyfoster.github.io","/thermaleaf-panels",
+  "/tight","/trolls","/truthreport","/unified-ontology","/vascusweep",
+  "/vascusweep-tower","/vehicleemotiontether","/veiltext","/waverider",
+  "/why","/wizard"
+];
+
+// ===== Tagging & Description Logic =====
+function tagFor(name) {
+  const n = name.toLowerCase();
+  const tags = [];
+  if (/(^|\/)(sentinel|prime-sentinel|sentinelarc)\b/.test(n)) tags.push("Sentinel");
+  if (/(^|\/)(peace|peace\-lab|peace\-ripple\-tracker|peacerippletracker)\b/.test(n)) tags.push("Peace");
+  if (/corruption|\banti-corruption|stateofaffairs|truthreport/.test(n)) tags.push("Corruption");
+  if (/(dashboard|leaderboards|impacttracker)/.test(n)) tags.push("Dashboard");
+  if (/education|honorlearning|opengamify|gamification|learning|education2/.test(n)) tags.push("Education");
+  if (/eco|solar|myco|bio|hydro|reforestation|postfiresoil|romarine|thermaleaf|stratoweave|spirallift|waverider|fract|phasedrive|vascusweep|engine|models|lab|field|device|showerhead|tiles|canopy|lantern|ocean|filter|moss|igloo|freshfloor|planter/.test(n)) tags.push("Science");
+  if (/community|collective|comms|forum|chat|city|kinship|global|symbiote|registry|roadlight|openstay|openstore|start\-here|publicresumepack/.test(n)) tags.push("Community");
+  if (/gov|government|guardiantrust|policy|declaration|proposal|registry|unified\-ontology|ai\-collective\-governance|planetary\-repair\-agent\-swarm/.test(n)) tags.push("Governance");
+  if (/backup|logs|proof|safe_archiving|globalnotarization|conditional\-immutable\-storage|checksums|\.ots|\.zip$|index\-legacy\.html|index001\.html/.test(n)) tags.push("Backups");
+  if (/funding|donor|buymeacoffee|missionfuel|donate/i.test(name)) tags.push("Funding");
+  if (!tags.length) tags.push("Misc");
+  return tags;
+}
+
+function getDescription(path, tags) {
+  const t = translations[currentLang] || translations['en'];
+  const primaryTag = tags[0];
+  const descKey = primaryTag.toLowerCase() + '_desc';
+  return t[descKey] || t.misc_desc;
+}
+
+// ===== Storage & State Management =====
+const store = {
+  get() { 
+    try { return JSON.parse(localStorage.getItem('galactic_dir') || '{}'); } 
+    catch(e) { return {}; }
+  },
+  set(v) { localStorage.setItem('galactic_dir', JSON.stringify(v)); }
+};
+
+const state = Object.assign({xp: 0, lvl: 1, favs: {}, visited: {}}, store.get());
+const XP_PER_VISIT = 5;
+const XP_SENTINEL_BONUS = 15;
+const XP_PEACE_BONUS = 10;
+const XP_CORR_BONUS = 10;
+const XP_DASH_BONUS = 8;
+
+function capForLevel(l) { return 100 + (l - 1) * 50; }
+
+function addXP(n) {
+  state.xp += n;
+  while (state.xp >= capForLevel(state.lvl)) {
+    state.xp -= capForLevel(state.lvl);
+    state.lvl++;
+  }
+  persist();
+  renderHUD();
+}
+
+function persist() { store.set(state); }
+
+function renderHUD() {
+  document.getElementById('lvl').textContent = state.lvl;
+  document.getElementById('xp').textContent = Math.floor(state.xp);
+  document.getElementById('xpcap').textContent = capForLevel(state.lvl);
+  const xpFill = document.getElementById('xpfill');
+  xpFill.style.width = (state.xp / capForLevel(state.lvl) * 100) + '%';
+}
+
+// ===== Card Creation =====
+function mkEl(tag, cls, txt) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt) e.textContent = txt;
+  return e;
+}
+
+function urlTitle(p) { 
+  return p.replace(/^\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '/'; 
+}
+
+function cardFor(path) {
+  const tags = tagFor(path);
+  const t = translations[currentLang] || translations['en'];
+  const isSpecial = tags.some(tag => ['Sentinel', 'Peace', 'Corruption', 'Dashboard'].includes(tag));
+  
+  const card = mkEl('div', 'card' + (isSpecial ? ' special' : ''));
+  
+  // Add mouse tracking for glow effect
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    card.style.setProperty('--mouse-x', `${x}px`);
+    card.style.setProperty('--mouse-y', `${y}px`);
+  });
+  
+  const title = mkEl('div', 'title', urlTitle(path));
+  const pathEl = mkEl('div', 'path', path);
+  const desc = mkEl('div', 'desc', getDescription(path, tags));
+  
+  const tagWrap = mkEl('div', 'tags');
+  for (const tag of tags) {
+    const badgeClass = 'badge ' + (
+      tag === 'Sentinel' ? 'b-sentinel' :
+      tag === 'Peace' ? 'b-peace' :
+      tag === 'Corruption' ? 'b-corrupt' :
+      tag === 'Dashboard' ? 'b-dash' : ''
+    );
+    tagWrap.appendChild(mkEl('span', badgeClass, tag));
+  }
+  
+  const cta = mkEl('div', 'cta');
+  const openBtn = mkEl('a', '', t.open || 'Open');
+  openBtn.href = path;
+  openBtn.addEventListener('click', () => visit(path, tags));
+  
+  const favBtn = mkEl('button', '', state.favs[path] ? (t.unfavorite || '★ Unfavorite') : (t.favorite || '☆ Favorite'));
+  favBtn.addEventListener('click', () => {
+    state.favs[path] = !state.favs[path];
+    persist();
+    favBtn.textContent = state.favs[path] ? (t.unfavorite || '★ Unfavorite') : (t.favorite || '☆ Favorite');
+  });
+  
+  cta.append(openBtn, favBtn);
+  card.append(title, pathEl, desc, tagWrap, cta);
+  
+  return card;
+}
+
+function visit(path, tags) {
+  if (!state.visited[path]) {
+    state.visited[path] = Date.now();
+    let xp = XP_PER_VISIT;
+    if (tags.includes('Sentinel')) xp += XP_SENTINEL_BONUS;
+    if (tags.includes('Peace')) xp += XP_PEACE_BONUS;
+    if (tags.includes('Corruption')) xp += XP_CORR_BONUS;
+    if (tags.includes('Dashboard')) xp += XP_DASH_BONUS;
+    addXP(xp);
+    persist();
+  }
+}
+
+// ===== Rendering =====
+const grid = document.getElementById('grid');
+const featured = document.getElementById('featured');
+const search = document.getElementById('search');
+const filter = document.getElementById('filter');
+const favBtn = document.getElementById('favoritesBtn');
+const resetBtn = document.getElementById('resetProg');
+
+function renderAll(filterTag = '', term = '', onlyFavs = false) {
+  grid.innerHTML = '';
+  const q = term.trim().toLowerCase();
+  
+  const sorted = [...DIRS].sort((a, b) => {
+    const A = tagFor(a), B = tagFor(b);
+    const priority = t => (
+      t.includes('Sentinel') ? 0 :
+      t.includes('Peace') ? 1 :
+      t.includes('Corruption') ? 2 :
+      t.includes('Dashboard') ? 3 : 9
+    );
+    const d = priority(A) - priority(B);
+    return d || a.localeCompare(b);
+  });
+  
+  for (const p of sorted) {
+    const tags = tagFor(p);
+    if (filterTag && !tags.includes(filterTag)) continue;
+    if (onlyFavs && !state.favs[p]) continue;
+    if (q && !(p.toLowerCase().includes(q) || tags.join(' ').toLowerCase().includes(q))) continue;
+    grid.appendChild(cardFor(p));
+  }
+}
+
+function renderFeatured() {
+  featured.innerHTML = '';
+  const picks = DIRS.filter(p => 
+    /(^|\/)(sentinel|prime-sentinel|sentinelarc|peace|peace\-lab|peace\-ripple\-tracker|peacerippletracker|impacttracker|corruption|anti-corruption\.html)\b/i.test(p)
+  );
+  const top = Array.from(new Set(picks)).sort().slice(0, 8);
+  for (const p of top) featured.appendChild(cardFor(p));
+}
+
+// ===== Event Handlers =====
+search.addEventListener('input', () => renderAll(filter.value, search.value, favBtn.classList.contains('on')));
+filter.addEventListener('change', () => renderAll(filter.value, search.value, favBtn.classList.contains('on')));
+
+favBtn.addEventListener('click', () => {
+  const t = translations[currentLang] || translations['en'];
+  favBtn.classList.toggle('on');
+  favBtn.textContent = favBtn.classList.contains('on') ? (t.favorites + ' (On)') : t.favorites;
+  renderAll(filter.value, search.value, favBtn.classList.contains('on'));
+});
+
+resetBtn.addEventListener('click', () => {
+  const t = translations[currentLang] || translations['en'];
+  if (!confirm(t.confirmReset || 'Reset XP, level, visited, favorites?')) return;
+  localStorage.removeItem('galactic_dir');
+  state.xp = 0; state.lvl = 1; state.favs = {}; state.visited = {};
+  renderHUD();
+  renderFeatured();
+  renderAll(filter.value, search.value, favBtn.classList.contains('on'));
+});
+
+// Language selector
+document.getElementById('langSelect').addEventListener('change', (e) => {
+  setLanguage(e.target.value);
+});
+
+// ===== Initialize =====
+// Load saved language preference
+const savedLang = localStorage.getItem('galactic_lang') || 'en';
+document.getElementById('langSelect').value = savedLang;
+setLanguage(savedLang);
+
+renderHUD();
+renderFeatured();
+renderAll();
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  const sw = `
+    self.addEventListener('install', e => self.skipWaiting());
+    self.addEventListener('activate', e => self.clients.claim());
+    self.addEventListener('fetch', e => {});
+  `;
+  const blob = new Blob([sw], {type: 'text/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(() => {});
+}
+</script>
+</body>
+</html>
